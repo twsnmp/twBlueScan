@@ -42,12 +42,6 @@ $make
 ```
 を実行すれば、Linux(amd64),Linux(arm)用の実行ファイルが、`dist`のディレクトリに作成されます。
 
-Dockerイメージを作成するためには、
-```
-$make docker
-```
-を実行します。twssnmp/twpcaというDockerイメージが作成されます。
-
 配布用のZIPファイルを作成するためには、
 ```
 $make zip
@@ -83,21 +77,31 @@ syslogの送信先はカンマ区切りで複数指定できます。:の続け�
 -syslog 192.168.1.1,192.168.1.2:5514
 ```
 
+### 動作環境
+
+このプログラム起動するためにはLinux環境にbluezのインストールが必要です。
+
+```
+#apt install bluez
+```
+
+BlueToothのデバイスが利用可能であることを以下のコマンドで確認してください。
+
+```
+# hcitool dev
+Devices:
+	hci0	00:E9:3A:89:8D:FE
+```
 
 ### 起動方法
 
 起動するためには、モニタするアダプター(-adapter)とsyslogの送信先(-syslog)が必要です。
+アダプターのデフォルトはhci0になっています。省略できるという意味です。
 
 Linuxの環境では以下のコマンドで起動できます。（例はLinux場合）
 
 ```
 #./twBlueScan -adapter hci0 -syslog 192.168.1.1
-```
-
-Docker環境では以下のコマンドを実行すれば起動できます。
-
-```
-#docker run --rm -d  --name twpcap  --net host twsnmp/twBlueScan  -adapter hci0 -syslog 192.168.1.1
 ```
 
 ## Copyright

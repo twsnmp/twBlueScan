@@ -1,4 +1,4 @@
-.PHONY: all test clean zip docker
+.PHONY: all test clean zip
 
 ### バージョンの定義
 VERSION     := "v1.0.0"
@@ -26,10 +26,6 @@ clean:
 zip: $(TARGETS)
 	cd dist && $(ZIP) twBlueScan_linux_amd64.zip twBlueScan
 	cd dist && $(ZIP) twBlueScan_linux_arm.zip twBlueScan.arm
-
-docker:  $(DIST)/twBlueScan Docker/Dockerfile
-	cp dist/twBlueScan Docker/
-	cd Docker && docker build -t twsnmp/twBlueScan .
 
 ### 実行ファイルのビルドルール
 $(DIST)/twBlueScan: $(SRC)
