@@ -4,21 +4,17 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"runtime"
 	"sync"
 	"time"
 
 	"github.com/godbus/dbus/v5"
 	"github.com/muka/go-bluetooth/api"
-	"github.com/muka/go-bluetooth/api/beacon"
 	"github.com/muka/go-bluetooth/bluez/profile/adapter"
 	"github.com/muka/go-bluetooth/bluez/profile/device"
-	eddystone "github.com/suapapa/go_eddystone"
 )
 
-var beaconCount = 0
-var handleBeaconCount = 0
 var deviceMap sync.Map
-var beaconMap sync.Map
 
 // startBlueScan : start packet capchare
 func startBlueScan(ctx context.Context) {
@@ -43,9 +39,9 @@ func startBlueScan(ctx context.Context) {
 
 	timer := time.NewTicker(time.Second * time.Duration(syslogInterval))
 	defer timer.Stop()
-	total := int64(0)
-	count := int64(0)
-	remove := int64(0)
+	total := 0
+	new := 0
+	remove := 0
 	for {
 		select {
 		case ev := <-discovery:
@@ -57,20 +53,21 @@ func startBlueScan(ctx context.Context) {
 					checkBlueDevice(ev.Path)
 					deviceMap.Store(ev.Path, time.Now())
 				}
-				count++
+				new++
 			}
 			total++
 		case <-timer.C:
-			syslogCh <- fmt.Sprintf("type=Stats,total=%d,count=%d,remove=%d,ps=%.2f,send=%d,beacon=%d,param=%s", total, count, remove, float64(count)/float64(syslogInterval), syslogCount, beaconCount, adapterID)
 			sendMonitor()
+			device := 0
 			deviceMap.Range(func(key, value interface{}) bool {
 				checkBlueDevice(key)
+				device++
 				return true
 			})
-			log.Printf("total=%d count=%d remove=%d Beacon=%d,handle=%d", total, count, remove, beaconCount, handleBeaconCount)
+			syslogCh <- fmt.Sprintf("type=Stats,total=%d,device=%d,new=%d,remove=%d,send=%d,param=%s", total, device, new, remove, syslogCount, adapterID)
+			log.Printf("total=%d device=%d new=%d remove=%d NumGoroutine=%d", total, device, new, remove, runtime.NumGoroutine())
 			syslogCount = 0
-			beaconCount = 0
-			count = 0
+			new = 0
 			remove = 0
 		case <-ctx.Done():
 			log.Println("stop bluetooth scan")
@@ -131,87 +128,6 @@ func checkBlueDevice(p interface{}) {
 	if _, ok := deviceMap.Load(path); !ok {
 		log.Printf("device addr=%s name=%s vendor=%s", dev.Properties.Address, dev.Properties.Name, vendor)
 	}
-	if _, ok := beaconMap.Load(path); ok {
-		return
-	}
-	go func() {
-		handleBeaconCount++
-		beaconMap.Store(path, time.Now())
-		err = handleBeacon(dev)
-		if err != nil {
-			log.Printf("%s: %s", path, err)
-		}
-		handleBeaconCount--
-		beaconMap.Delete(path)
-	}()
-}
-
-// handleBeacon : ビーコンの内容をチェックする
-func handleBeacon(dev *device.Device1) error {
-	b, err := beacon.NewBeacon(dev)
-	if err != nil {
-		return err
-	}
-	ctx := context.Background()
-	beaconUpdated, err := b.WatchDeviceChanges(ctx)
-	if err != nil {
-		return err
-	}
-	isBeacon := <-beaconUpdated
-	if !isBeacon {
-		return nil
-	}
-	name := b.Device.Properties.Alias
-	if name == "" {
-		name = b.Device.Properties.Name
-	}
-	log.Printf("beacon tyep=%s name=%s", b.Type, name)
-	beaconCount++
-	if b.IsEddystone() {
-		ed := b.GetEddystone()
-		switch ed.Frame {
-		case eddystone.UID:
-			syslogCh <- fmt.Sprintf(
-				"type=EddystoneUID,address=%s,name=%s,uid=%s,instance=%s,power=%d",
-				b.Device.Properties.Address,
-				name,
-				ed.UID,
-				ed.InstanceUID,
-				ed.CalibratedTxPower,
-			)
-		case eddystone.TLM:
-			syslogCh <- fmt.Sprintf(
-				"type=EddystoneTLM,address=%s,name=%s,temp=%.0f,batt=%d,reboot=%d,advertising=%d,power=%d",
-				b.Device.Properties.Address,
-				name,
-				ed.TLMTemperature,
-				ed.TLMBatteryVoltage,
-				ed.TLMLastRebootedTime,
-				ed.TLMAdvertisingPDU,
-				ed.CalibratedTxPower,
-			)
-		case eddystone.URL:
-			syslogCh <- fmt.Sprintf(
-				"type=EddystoneURL,address=%s,name=%s,url=%s,power=%d",
-				b.Device.Properties.Address,
-				name,
-				ed.URL,
-				ed.CalibratedTxPower,
-			)
-		}
-	} else if b.IsIBeacon() {
-		ibeacon := b.GetIBeacon()
-		syslogCh <- fmt.Sprintf(
-			"type=IBeacon,address=%s,name=%s,uuid=%s,power=%d,major=%d,minor=%d",
-			b.Device.Properties.Address,
-			name,
-			ibeacon.ProximityUUID,
-			ibeacon.MeasuredPower,
-			ibeacon.Major,
-			ibeacon.Minor,
-		)
-	}
-	return nil
 }
 
 // OMRONSセンサーのデータ
