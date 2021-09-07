@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -64,7 +65,8 @@ func startBlueScan(ctx context.Context) {
 				device++
 				return true
 			})
-			syslogCh <- fmt.Sprintf("type=Stats,total=%d,device=%d,new=%d,remove=%d,send=%d,param=%s", total, device, new, remove, syslogCount, adapterID)
+			syslogCh <- fmt.Sprintf("type=Stats,total=%d,device=%d,count=%d,new=%d,remove=%d,send=%d,param=%s",
+				total, device, new, new, remove, syslogCount, adapterID)
 			log.Printf("total=%d device=%d new=%d remove=%d NumGoroutine=%d", total, device, new, remove, runtime.NumGoroutine())
 			syslogCount = 0
 			new = 0
@@ -92,6 +94,11 @@ func checkBlueDevice(p interface{}) {
 		log.Printf("%s: not found", path)
 		return
 	}
+	if dev.Properties.RSSI >= 0 {
+		deviceMap.Delete(path)
+		log.Printf("%s:%s: RSSI = 0", path, dev.Properties.Address)
+		return
+	}
 	vendor := ""
 	md := ""
 	for k := range dev.Properties.ManufacturerData {
@@ -116,13 +123,13 @@ func checkBlueDevice(p interface{}) {
 			}
 		}
 	}
-	if vendor == "" && dev.Properties.AddressType == "public" {
+	if vendor == "" {
 		vendor = getVendorFromAddress(dev.Properties.Address)
 	}
 	syslogCh <- fmt.Sprintf("type=Device,address=%s,name=%s,rssi=%d,addrType=%s,vendor=%s,md=%s",
 		dev.Properties.Address, dev.Properties.Name, dev.Properties.RSSI,
 		dev.Properties.AddressType, vendor, md)
-	if dev.Properties.Name == "Rbt" {
+	if strings.HasPrefix(dev.Properties.Name, "Rbt") {
 		checkOMRONEnv(dev)
 	}
 	if _, ok := deviceMap.Load(path); !ok {

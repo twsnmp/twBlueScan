@@ -30,7 +30,7 @@ func init() {
 	flag.IntVar(&syslogInterval, "interval", 600, "syslog send interval(sec)")
 	flag.StringVar(&cpuprofile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memprofile, "memprofile", "", "write memory profile to `file`")
-	flag.StringVar(&codeToVendor, "code", "", "make comapny code to vendor map")
+	flag.StringVar(&codeToVendor, "code", "", "make company code to vendor map")
 	flag.StringVar(&addrToVendor, "addr", "", "make address to vendor map")
 	flag.VisitAll(func(f *flag.Flag) {
 		if s := os.Getenv("TWBLUESCAN_" + strings.ToUpper(f.Name)); s != "" {
