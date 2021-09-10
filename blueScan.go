@@ -6,7 +6,6 @@ import (
 	"log"
 	"runtime"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/godbus/dbus/v5"
@@ -14,8 +13,6 @@ import (
 	"github.com/muka/go-bluetooth/bluez/profile/adapter"
 	"github.com/muka/go-bluetooth/bluez/profile/device"
 )
-
-var deviceMap sync.Map
 
 // startBlueScan : start packet capchare
 func startBlueScan(ctx context.Context) {
@@ -47,27 +44,18 @@ func startBlueScan(ctx context.Context) {
 		select {
 		case ev := <-discovery:
 			if ev.Type == adapter.DeviceRemoved {
-				deviceMap.Delete(ev.Path)
 				remove++
 			} else {
-				if _, ok := deviceMap.Load(ev.Path); !ok {
-					checkBlueDevice(ev.Path)
-					deviceMap.Store(ev.Path, time.Now())
-				}
+				checkBlueDevice(ev.Path)
 				new++
 			}
 			total++
 		case <-timer.C:
 			sendMonitor()
-			device := 0
-			deviceMap.Range(func(key, value interface{}) bool {
-				checkBlueDevice(key)
-				device++
-				return true
-			})
-			syslogCh <- fmt.Sprintf("type=Stats,total=%d,device=%d,count=%d,new=%d,remove=%d,send=%d,param=%s",
-				total, device, new, new, remove, syslogCount, adapterID)
-			log.Printf("total=%d device=%d new=%d remove=%d NumGoroutine=%d", total, device, new, remove, runtime.NumGoroutine())
+			a.FlushDevices()
+			syslogCh <- fmt.Sprintf("type=Stats,total=%d,count=%d,remove=%d,send=%d,param=%s",
+				total, new, remove, syslogCount, adapterID)
+			log.Printf("total=%d count=%d remove=%d NumGoroutine=%d", total, new, remove, runtime.NumGoroutine())
 			syslogCount = 0
 			new = 0
 			remove = 0
@@ -85,17 +73,14 @@ func checkBlueDevice(p interface{}) {
 	}
 	dev, err := device.NewDevice1(path)
 	if err != nil {
-		deviceMap.Delete(path)
 		log.Printf("%s: %s", path, err)
 		return
 	}
 	if dev == nil {
-		deviceMap.Delete(path)
 		log.Printf("%s: not found", path)
 		return
 	}
 	if dev.Properties.RSSI >= 0 {
-		deviceMap.Delete(path)
 		log.Printf("%s:%s: RSSI = 0", path, dev.Properties.Address)
 		return
 	}
@@ -132,9 +117,7 @@ func checkBlueDevice(p interface{}) {
 	if strings.HasPrefix(dev.Properties.Name, "Rbt") {
 		checkOMRONEnv(dev)
 	}
-	if _, ok := deviceMap.Load(path); !ok {
-		log.Printf("device addr=%s name=%s vendor=%s", dev.Properties.Address, dev.Properties.Name, vendor)
-	}
+	log.Printf("device addr=%s name=%s vendor=%s", dev.Properties.Address, dev.Properties.Name, vendor)
 }
 
 // OMRONSセンサーのデータ
