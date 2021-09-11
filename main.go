@@ -17,8 +17,8 @@ import (
 var version = "v1.0.0"
 var commit = ""
 var syslogDst = ""
-var adapterID = ""
-var syslogInterval = 600
+var adapter = ""
+var syslogInterval = 300
 var cpuprofile string
 var memprofile string
 var codeToVendor string
@@ -26,7 +26,7 @@ var addrToVendor string
 
 func init() {
 	flag.StringVar(&syslogDst, "syslog", "", "syslog destnation list")
-	flag.StringVar(&adapterID, "adapter", "hci0", "monitor bluetooth adapter")
+	flag.StringVar(&adapter, "adapter", "hci0", "monitor bluetooth adapter")
 	flag.IntVar(&syslogInterval, "interval", 600, "syslog send interval(sec)")
 	flag.StringVar(&cpuprofile, "cpuprofile", "", "write cpu profile to `file`")
 	flag.StringVar(&memprofile, "memprofile", "", "write memory profile to `file`")
@@ -81,7 +81,7 @@ func main() {
 		return
 	}
 	log.Printf("version=%s", fmt.Sprintf("%s(%s)", version, commit))
-	if adapterID == "" {
+	if adapter == "" {
 		log.Fatalln("no monitor adapter")
 	}
 	if syslogDst == "" {
