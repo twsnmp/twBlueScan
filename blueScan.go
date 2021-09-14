@@ -40,6 +40,7 @@ func (d *BluetoothDeviceEnt) String() string {
 
 var deviceMap sync.Map
 var total = 0
+var skip = 0
 
 // startBlueScan : start scan
 func startBlueScan(ctx context.Context) {
@@ -77,12 +78,17 @@ func startBlueScan(ctx context.Context) {
 }
 
 func checkBlueDevice(r *host.ScanReport) {
+	rssi := int(r.Rssi)
+	if rssi == 0 {
+		skip++
+		return
+	}
 	total++
 	now := time.Now().Unix()
 	addr := r.Address.String()
 	if v, ok := deviceMap.Load(addr); ok {
 		if d, ok := v.(*BluetoothDeviceEnt); ok {
-			d.RSSI = int(r.Rssi)
+			d.RSSI = rssi
 			if d.RSSI > d.MaxRSSI {
 				d.MaxRSSI = d.RSSI
 			}
@@ -107,6 +113,7 @@ func checkBlueDevice(r *host.ScanReport) {
 	checkDeviceInfo(d, r)
 	deviceMap.Store(addr, d)
 }
+
 func getVendor(d *BluetoothDeviceEnt) string {
 	if d.Code != 0x0000 {
 		if v, ok := codeToVendorMap[d.Code]; ok {
@@ -262,7 +269,8 @@ func sendReport() {
 	})
 	syslogCh <- fmt.Sprintf("type=Stats,total=%d,count=%d,new=%d,remove=%d,send=%d,param=%s",
 		total, count, new, remove, syslogCount, adapter)
-	log.Printf("total=%d count=%d new=%d remove=%d omron=%d send=%d", total, count, new, remove, omron, syslogCount)
+	log.Printf("total=%d skip=%d count=%d new=%d remove=%d omron=%d send=%d",
+		total, skip, count, new, remove, omron, syslogCount)
 	syslogCount = 0
 	lastSendTime = now
 }
