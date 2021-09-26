@@ -1,7 +1,7 @@
 .PHONY: all test clean zip
 
 ### バージョンの定義
-VERSION     := "v2.0.1"
+VERSION     := "v2.1.0"
 COMMIT      := $(shell git rev-parse --short HEAD)
 WD          := $(shell pwd)
 ### コマンドの定義

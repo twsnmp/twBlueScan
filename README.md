@@ -27,6 +27,7 @@ Linuxマシンで周辺にあるBlueToothデバイスの情報を収集してsys
 2021/9/2   v1.0.0 最初のリリース
 2021/9/11  v1.1.0 改善版（リリースしなかった）
 2021/9/12  v2.0.0 低レベルのパッケージbluewakerに変更
+2021/9/27  v2.1.0 SwitchBotのセンサーとアクティブモードスキャンに対応
 
 ## Build
 
@@ -57,15 +58,20 @@ $make zip
 ### 使用方法
 
 ```
+#twBlueScan -h
 Usage of /tmp/twBlueScan:
+  -active
+    	active scan mode
   -adapter string
     	monitor bluetooth adapter (default "hci0")
   -addr string
     	make address to vendor map
   -code string
-    	make comapny code to vendor map
+    	make company code to vendor map
   -cpuprofile file
     	write cpu profile to file
+  -debug
+    	debug mode
   -interval int
     	syslog send interval(sec) (default 600)
   -memprofile file
@@ -104,6 +110,8 @@ Devices:
 
 起動するためには、モニタするアダプター(-adapter)とsyslogの送信先(-syslog)が必要です。
 アダプターのデフォルトはhci0になっています。省略できるという意味です。
+SwitchBotの温度センサーを見つけるためには、
+-activeを指定してアクティブモードでスキャンしてください。
 
 Linuxの環境では以下のコマンドで起動できます。（例はLinux場合）
 

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"gitlab.com/jtaimisto/bluewalker/hci"
 	"gitlab.com/jtaimisto/bluewalker/host"
 )
@@ -22,7 +23,6 @@ type BluetoothDeviceEnt struct {
 	RSSI        int
 	Info        string
 	Count       int
-	Total       int
 	Code        uint16
 	EnvData     []byte
 	FirstTime   int64
@@ -55,7 +55,7 @@ func startBlueScan(ctx context.Context) {
 	if err = h.Init(); err != nil {
 		log.Fatalln("Init", err)
 	}
-	reportCh, err := h.StartScanning(false, nil)
+	reportCh, err := h.StartScanning(active, nil)
 	if err != nil {
 		log.Fatalln("startScan", err)
 	}
@@ -98,6 +98,7 @@ func checkBlueDevice(r *host.ScanReport) {
 			checkDeviceInfo(d, r)
 			d.Count++
 			d.LastTime = now
+			return
 		} else {
 			deviceMap.Delete(addr)
 		}
@@ -107,6 +108,7 @@ func checkBlueDevice(r *host.ScanReport) {
 		RSSI:      int(r.Rssi),
 		MinRSSI:   int(r.Rssi),
 		MaxRSSI:   int(r.Rssi),
+		Count:     1,
 		FirstTime: now,
 		LastTime:  now,
 	}
@@ -123,6 +125,8 @@ func getVendor(d *BluetoothDeviceEnt) string {
 	}
 	return getVendorFromAddress(d.Address)
 }
+
+var uuidMap sync.Map
 
 func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 	if d.AddressType == "" {
@@ -146,6 +150,38 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 			code = uint16(a.Data[1])*256 + uint16(a.Data[0])
 			if code == 0x02d5 && len(a.Data) >= 18 {
 				d.EnvData = a.Data[2:]
+				// } else if code == 0x004c {
+				// 	if debug {
+				// 		log.Println("apple md", d.Address, a.String())
+				// 	}
+				// } else if code == 0x012d {
+				// 	if debug {
+				// 		log.Println("sony md", d.Address, a.String())
+				// 	}
+				// } else {
+				// 	if debug {
+				// 		log.Println("other md", d.Address, a.String())
+				// 	}
+			}
+		case hci.AdTxPower:
+		case hci.AdComplete128BitService:
+			if id, err := uuid.FromBytes(a.Data); err == nil {
+				if _, ok := uuidMap.Load(d.Address + id.String()); !ok {
+					uuidMap.Store(d.Address+id.String(), true)
+					if debug {
+						log.Println("uuid", d.Address, id.String())
+					}
+				}
+			} else {
+				log.Println(err)
+			}
+		case hci.AdServiceData:
+			if len(a.Data) == 8 && a.Data[0] == 0 && a.Data[1] == 0x0d && a.Data[2] == 0x54 {
+				d.EnvData = a.Data[:]
+			}
+		default:
+			if debug {
+				log.Println("unknown", d.Address, a.String())
 			}
 		}
 	}
@@ -226,12 +262,30 @@ func sendOMRONEnv(d *BluetoothDeviceEnt) {
 	sound := float64(int(d.EnvData[13])*256+int(d.EnvData[12])) * 0.01
 	v := int(d.EnvData[15])*256 + int(d.EnvData[14])
 	co2 := int(d.EnvData[17])*256 + int(d.EnvData[16])
-	log.Printf("omron seq=%d,temp=%.02f,hum=%.02f,lx=%d,press=%.02f,sound=%.02f,eTVOC=%d,eCO2=%d",
-		seq, temp, hum, lx, press, sound, v, co2,
-	)
+	if debug {
+		log.Printf("omron seq=%d,temp=%.02f,hum=%.02f,lx=%d,press=%.02f,sound=%.02f,eTVOC=%d,eCO2=%d",
+			seq, temp, hum, lx, press, sound, v, co2)
+	}
 	syslogCh <- fmt.Sprintf("type=OMRONEnv,address=%s,name=%s,rssi=%d,seq=%d,temp=%.02f,hum=%.02f,lx=%d,press=%.02f,sound=%.02f,eTVOC=%d,eCO2=%d",
 		d.Address, d.Name, d.RSSI,
 		seq, temp, hum, lx, press, sound, v, co2,
+	)
+}
+
+//  0x00 0d 54 10 e4 07 9a 37
+func sendSwitchBotEnv(d *BluetoothDeviceEnt) {
+	bat := int(d.EnvData[4] & 0x7f)
+	temp := float64(int(d.EnvData[5]&0x0f))/10.0 + float64(d.EnvData[6]&0x7f)
+	if (d.EnvData[6] & 0x80) != 0x80 {
+		temp *= -1.0
+	}
+	hum := float64(int(d.EnvData[7] & 0x7f))
+	if debug {
+		log.Printf("switchbot temp=%.02f,hum=%.02f,bat=%d", temp, hum, bat)
+	}
+	syslogCh <- fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,bat=%d",
+		d.Address, d.Name, d.RSSI,
+		temp, hum, bat,
 	)
 }
 
@@ -242,6 +296,7 @@ func sendReport() {
 	new := 0
 	remove := 0
 	omron := 0
+	swbot := 0
 	now := time.Now().Unix()
 	deviceMap.Range(func(k, v interface{}) bool {
 		d, ok := v.(*BluetoothDeviceEnt)
@@ -264,13 +319,19 @@ func sendReport() {
 			sendOMRONEnv(d)
 			omron++
 		}
+		if len(d.EnvData) == 8 && d.EnvData[0] == 0 && d.EnvData[1] == 0x0d && d.EnvData[2] == 0x54 {
+			sendSwitchBotEnv(d)
+			swbot++
+		}
 		syslogCh <- d.String()
 		return true
 	})
 	syslogCh <- fmt.Sprintf("type=Stats,total=%d,count=%d,new=%d,remove=%d,send=%d,param=%s",
 		total, count, new, remove, syslogCount, adapter)
-	log.Printf("total=%d skip=%d count=%d new=%d remove=%d omron=%d send=%d",
-		total, skip, count, new, remove, omron, syslogCount)
+	if debug {
+		log.Printf("total=%d skip=%d count=%d new=%d remove=%d omron=%d swbot=%d send=%d",
+			total, skip, count, new, remove, omron, swbot, syslogCount)
+	}
 	syslogCount = 0
 	lastSendTime = now
 }
