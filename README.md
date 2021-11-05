@@ -1,15 +1,15 @@
 # twBlueScan
-BlueTooth Device Sensor for TWSNMP
 
-TWSNMPのためのBlueToothデバイスセンサー
+BlueTooth Device Sensor for TWSNMP FC  
+TWSNMPのためのBlueToothデバイスセンサー  
 
 [![Godoc Reference](https://godoc.org/github.com/twsnmp/twBlueScan?status.svg)](http://godoc.org/github.com/twsnmp/twBlueScan)
 [![Go Report Card](https://goreportcard.com/badge/twsnmp/twBlueScan)](https://goreportcard.com/report/twsnmp/twBlueScan)
 
 ## Overview
 
-Linuxマシンで周辺にあるBlueToothデバイスの情報を収集してsyslogで送信するためのセンサー
-プログラムです。
+Linuxマシンで周辺にあるBlueToothデバイスの情報を収集して  
+syslogでTWSNMP FCなどに送信するためのセンサープログラムです。
 
 収集する情報は
 
@@ -22,12 +22,12 @@ Linuxマシンで周辺にあるBlueToothデバイスの情報を収集してsys
 
 ## Status
 
-2021/8/29  開発を開始したばかりの最初のバージョンがとりあえず動作した。
-2021/9/1   RC1テスト中（ビーコンの検知は断念）
-2021/9/2   v1.0.0 最初のリリース
-2021/9/11  v1.1.0 改善版（リリースしなかった）
-2021/9/12  v2.0.0 低レベルのパッケージbluewakerに変更
-2021/9/27  v2.1.0 SwitchBotのセンサーとアクティブモードスキャンに対応
+2021/8/29  開発を開始したばかりの最初のバージョンがとりあえず動作した。  
+2021/9/1   RC1テスト中（ビーコンの検知は断念）  
+2021/9/2   v1.0.0 最初のリリース  
+2021/9/11  v1.1.0 改善版（リリースしなかった）  
+2021/9/12  v2.0.0 低レベルのパッケージbluewakerに変更  
+2021/9/27  v2.1.0 SwitchBotのセンサーとアクティブモードスキャンに対応  
 
 ## Build
 
@@ -108,16 +108,26 @@ Devices:
 
 ### 起動方法
 
-起動するためには、モニタするアダプター(-adapter)とsyslogの送信先(-syslog)が必要です。
-アダプターのデフォルトはhci0になっています。省略できるという意味です。
-SwitchBotの温度センサーを見つけるためには、
--activeを指定してアクティブモードでスキャンしてください。
+起動するためにはモニタするアダプター(-adapter)と  
+syslogの送信先(-syslog)が必要です。
+アダプターのデフォルトはhci0になっています。  
+省略できるという意味です。  
+SwitchBotの温度センサーを見つけるためには、  
+-activeを指定してアクティブモードでスキャンしてください。  
 
-Linuxの環境では以下のコマンドで起動できます。（例はLinux場合）
+以下のコマンドで起動できます。
 
 ```
 #./twBlueScan -adapter hci0 -syslog 192.168.1.1
 ```
+
+## TWSNMP FCのパッケージ
+
+TWSNMP FCのパッケージにtwBlueScanが含まれています。  
+Linux(amd64,arm)版があります。  
+詳しくは、  
+https://note.com/twsnmp/n/nc6e49c284afb  
+を見てください。
 
 ## Copyright
 
