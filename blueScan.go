@@ -18,6 +18,7 @@ type BluetoothDeviceEnt struct {
 	Address     string
 	AddressType string
 	Name        string
+	FixedAddr   bool
 	MinRSSI     int
 	MaxRSSI     int
 	RSSI        int
@@ -121,7 +122,6 @@ func getVendor(d *BluetoothDeviceEnt) string {
 		if v, ok := codeToVendorMap[d.Code]; ok {
 			return fmt.Sprintf("%s(0x%04x)", v, d.Code)
 		}
-		return fmt.Sprintf("unknown(0x%04x)", d.Code)
 	}
 	return getVendorFromAddress(d.Address)
 }
@@ -130,7 +130,7 @@ var uuidMap sync.Map
 
 func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 	if d.AddressType == "" {
-		d.AddressType = getAddrType(r.Address)
+		setAddrType(d, r.Address)
 	}
 	name := ""
 	info := ""
@@ -148,20 +148,36 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 				continue
 			}
 			code = uint16(a.Data[1])*256 + uint16(a.Data[0])
-			if code == 0x02d5 && len(a.Data) >= 18 {
-				d.EnvData = a.Data[2:]
-				// } else if code == 0x004c {
-				// 	if debug {
-				// 		log.Println("apple md", d.Address, a.String())
-				// 	}
-				// } else if code == 0x012d {
-				// 	if debug {
-				// 		log.Println("sony md", d.Address, a.String())
-				// 	}
-				// } else {
-				// 	if debug {
-				// 		log.Println("other md", d.Address, a.String())
-				// 	}
+			switch code {
+			case 0x02d5:
+				if len(a.Data) >= 18 {
+					d.EnvData = a.Data[2:]
+					log.Println(d.EnvData)
+				} else {
+					log.Panicln("env")
+				}
+			case 0x0969:
+				// SwitchBot Plug Mini
+				// https://github.com/OpenWonderLabs/SwitchBotAPI-BLE/blob/latest/devicetypes/plugmini.md
+				// UUID 105 9
+				// MAC 96 85 249 45 33 206
+				// Seq 25
+				// On/Off 128
+				// Time 0
+				// wifi RSSI 0
+				// Load 1 214  Overload
+				if len(a.Data) >= 14 {
+					d.EnvData = a.Data[9:]
+				}
+			case 0x004c, 0x0006:
+				// Apple and MS Skip
+			case 0x1c03, 0x1d03:
+				// data=031c71105d139c04e5ac2655f52ed242
+				// Bose Skip
+			default:
+				if debug {
+					log.Printf("AdManufacturerSpecific code=%04x data=%x", code, a.Data)
+				}
 			}
 		case hci.AdTxPower:
 		case hci.AdComplete128BitService:
@@ -178,7 +194,13 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 		case hci.AdServiceData:
 			if len(a.Data) == 8 && a.Data[0] == 0 && a.Data[1] == 0x0d && a.Data[2] == 0x54 {
 				d.EnvData = a.Data[:]
+			} else {
+				if debug {
+					log.Printf("AdServiceData data=%v", a.Data)
+				}
 			}
+		case hci.AdComplete16BitService:
+			// Skip
 		default:
 			if debug {
 				log.Println("unknown", d.Address, a.String())
@@ -220,22 +242,23 @@ func getInfoFromFlag(flag int) string {
 	return ret
 }
 
-func getAddrType(addr hci.BtAddress) string {
-	ret := addr.Atype.String()
+func setAddrType(d *BluetoothDeviceEnt, addr hci.BtAddress) {
+	at := addr.Atype.String()
 	if addr.Atype == hci.LeRandomAddress {
-		ret += "("
+		at += "("
 		if addr.IsNonResolvable() {
-			ret += "non-resolvable"
+			at += "non-resolvable"
 		} else if addr.IsResolvable() {
-			ret += "resolvable"
+			at += "resolvable"
 		} else if addr.IsStatic() {
-			ret += "static"
+			at += "static"
 		} else {
-			ret += "??"
+			at += "??"
 		}
-		ret += ")"
+		at += ")"
 	}
-	return ret
+	d.FixedAddr = addr.Atype == hci.LePublicAddress || addr.IsStatic()
+	d.AddressType = at
 }
 
 // OMRONSセンサーのデータ
@@ -289,6 +312,19 @@ func sendSwitchBotEnv(d *BluetoothDeviceEnt) {
 	)
 }
 
+func sendSwitchBotPlugMini(d *BluetoothDeviceEnt) {
+	sw := d.EnvData[0] == 0x80
+	over := (d.EnvData[3] & 0x80) == 0x80
+	load := int(d.EnvData[3]&0x7f)*256 + int(d.EnvData[4]&0x7f)
+	if debug {
+		log.Printf("switchbot miniplug sw=%v,over=%v,load=%d", sw, over, load)
+	}
+	syslogCh <- fmt.Sprintf("type=SwitchBotPlugMini,address=%s,name=%s,rssi=%d,sw=%v,over=%v,load=%d",
+		d.Address, d.Name, d.RSSI,
+		sw, over, load,
+	)
+}
+
 var lastSendTime int64
 
 func sendReport() {
@@ -297,18 +333,25 @@ func sendReport() {
 	remove := 0
 	omron := 0
 	swbot := 0
+	report := 0
+	junk := 0
 	now := time.Now().Unix()
 	deviceMap.Range(func(k, v interface{}) bool {
 		d, ok := v.(*BluetoothDeviceEnt)
 		if !ok {
 			return true
 		}
-		if d.LastTime < now-3600*1 {
+		important := d.Name != "" || d.FixedAddr || len(d.EnvData) > 0
+		if (!important && d.LastTime < now-15*60+10) || d.LastTime < now-60*60*48 {
 			deviceMap.Delete(k)
 			remove++
 			return true
 		}
 		count++
+		if !allAddress && !important {
+			junk++
+			return true
+		}
 		if d.LastTime < lastSendTime {
 			return true
 		}
@@ -318,19 +361,25 @@ func sendReport() {
 		if strings.HasPrefix(d.Name, "Rbt") && len(d.EnvData) >= 18 && d.EnvData[0] == 1 {
 			sendOMRONEnv(d)
 			omron++
-		}
-		if len(d.EnvData) == 8 && d.EnvData[0] == 0 && d.EnvData[1] == 0x0d && d.EnvData[2] == 0x54 {
+		} else if len(d.EnvData) == 8 && d.EnvData[0] == 0 && d.EnvData[1] == 0x0d && d.EnvData[2] == 0x54 {
 			sendSwitchBotEnv(d)
 			swbot++
+		} else if len(d.EnvData) >= 4 && d.Code == 0x0969 {
+			sendSwitchBotPlugMini(d)
+			swbot++
+		}
+		if debug {
+			log.Println(d.String())
 		}
 		syslogCh <- d.String()
+		report++
 		return true
 	})
-	syslogCh <- fmt.Sprintf("type=Stats,total=%d,count=%d,new=%d,remove=%d,send=%d,param=%s",
-		total, count, new, remove, syslogCount, adapter)
+	syslogCh <- fmt.Sprintf("type=Stats,total=%d,count=%d,new=%d,remove=%d,report=%d,junk=%d,send=%d,param=%s",
+		total, count, new, remove, report, junk, syslogCount, adapter)
 	if debug {
-		log.Printf("total=%d skip=%d count=%d new=%d remove=%d omron=%d swbot=%d send=%d",
-			total, skip, count, new, remove, omron, swbot, syslogCount)
+		log.Printf("total=%d skip=%d count=%d new=%d remove=%d omron=%d swbot=%d send=%d report=%d junk=%d",
+			total, skip, count, new, remove, omron, swbot, syslogCount, report, junk)
 	}
 	syslogCount = 0
 	lastSendTime = now

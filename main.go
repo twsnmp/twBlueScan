@@ -25,6 +25,7 @@ var codeToVendor string
 var addrToVendor string
 var debug bool
 var active bool
+var allAddress bool
 
 func init() {
 	flag.StringVar(&syslogDst, "syslog", "", "syslog destnation list")
@@ -36,6 +37,7 @@ func init() {
 	flag.StringVar(&addrToVendor, "addr", "", "make address to vendor map")
 	flag.BoolVar(&debug, "debug", false, "debug mode")
 	flag.BoolVar(&active, "active", false, "active scan mode")
+	flag.BoolVar(&active, "all", false, "report all address(include private)")
 	flag.VisitAll(func(f *flag.Flag) {
 		if s := os.Getenv("TWBLUESCAN_" + strings.ToUpper(f.Name)); s != "" {
 			f.Value.Set(s)
