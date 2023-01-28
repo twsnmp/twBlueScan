@@ -46,7 +46,7 @@ var skip = 0
 // startBlueScan : start scan
 func startBlueScan(ctx context.Context) {
 	if err := exec.Command("hciconfig", adapter, "down").Run(); err != nil {
-		log.Panic(err)
+		log.Panicf("start bluescan err=%v", err)
 	}
 	raw, err := hci.Raw(adapter)
 	if err != nil {
@@ -152,9 +152,6 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 			case 0x02d5:
 				if len(a.Data) >= 18 {
 					d.EnvData = a.Data[2:]
-					log.Println(d.EnvData)
-				} else {
-					log.Panicln("env")
 				}
 			case 0x0969:
 				// SwitchBot Plug Mini
@@ -189,7 +186,7 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 					}
 				}
 			} else {
-				log.Println(err)
+				log.Printf("uuid err=%v", err)
 			}
 		case hci.AdServiceData:
 			if len(a.Data) == 8 && a.Data[0] == 0 && a.Data[1] == 0x0d && a.Data[2] == 0x54 {
@@ -295,7 +292,7 @@ func sendOMRONEnv(d *BluetoothDeviceEnt) {
 	)
 }
 
-//  0x00 0d 54 10 e4 07 9a 37
+// 0x00 0d 54 10 e4 07 9a 37
 func sendSwitchBotEnv(d *BluetoothDeviceEnt) {
 	bat := int(d.EnvData[4] & 0x7f)
 	temp := float64(int(d.EnvData[5]&0x0f))/10.0 + float64(d.EnvData[6]&0x7f)
