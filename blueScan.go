@@ -43,6 +43,17 @@ var deviceMap sync.Map
 var total = 0
 var skip = 0
 
+type MotionSensorEnt struct {
+	Address      string
+	Moving       bool
+	LastMove     int64
+	LastMoveDiff int64
+	Battery      int
+	Light        bool
+}
+
+var motionSensorMap sync.Map
+
 // startBlueScan : start scan
 func startBlueScan(ctx context.Context) {
 	if err := exec.Command("hciconfig", adapter, "down").Run(); err != nil {
@@ -173,7 +184,7 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 				// Bose Skip
 			default:
 				if debug {
-					log.Printf("AdManufacturerSpecific code=%04x data=%x", code, a.Data)
+					log.Printf("AdManufacturerSpecific code=%04x data=%x d=%+v", code, a.Data, d)
 				}
 			}
 		case hci.AdTxPower:
@@ -191,16 +202,51 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 		case hci.AdServiceData:
 			if len(a.Data) == 8 && a.Data[0] == 0 && a.Data[1] == 0x0d && a.Data[2] == 0x54 {
 				d.EnvData = a.Data[:]
+			} else if r.Type == hci.ScanRsp && len(a.Data) == 8 && a.Data[0] == 0x3d &&
+				a.Data[1] == 0xfd && a.Data[2] == 0x73 {
+				// Motion Sensor Broadcast
+				// Data:[Service Data : 0x3dfd7300e4062202]}
+				// https://github.com/OpenWonderLabs/SwitchBotAPI-BLE/blob/latest/devicetypes/motionsensor.md#motion-sensor-broadcast-message
+				t := int64(a.Data[5])*256 + int64(a.Data[6])
+				if a.Data[7]&0x80 == 0x80 {
+					t += 0x10000
+				}
+				m := a.Data[3]&0x40 == 0x40
+				l := a.Data[7]&0x02 == 0x02
+				addr := r.Address.String()
+				if v, ok := motionSensorMap.Load(addr); ok {
+					if ms, ok := v.(*MotionSensorEnt); ok {
+						send := ms.Moving != m
+						ms.Battery = int(a.Data[4])
+						ms.LastMove = time.Now().Unix() - t
+						ms.Light = l
+						ms.Moving = m
+						ms.LastMoveDiff = t
+						if send {
+							sendMotionSensor(ms, "change")
+						}
+					}
+				} else {
+					ms := &MotionSensorEnt{
+						Address:  addr,
+						Moving:   m,
+						LastMove: time.Now().Unix() - t,
+						Light:    l,
+						Battery:  int(a.Data[4]),
+					}
+					motionSensorMap.Store(addr, ms)
+					sendMotionSensor(ms, "new")
+				}
 			} else {
 				if debug {
-					log.Printf("AdServiceData data=%v", a.Data)
+					log.Printf("AdServiceData data=%x", a.Data)
 				}
 			}
 		case hci.AdComplete16BitService:
 			// Skip
 		default:
 			if debug {
-				log.Println("unknown", d.Address, a.String())
+				log.Printf("unknown d=%+v a=%s", d, a.String())
 			}
 		}
 	}
@@ -322,6 +368,14 @@ func sendSwitchBotPlugMini(d *BluetoothDeviceEnt) {
 	)
 }
 
+func sendMotionSensor(ms *MotionSensorEnt, event string) {
+	if debug {
+		log.Printf("switchbot motion sensor %s %+v", event, ms)
+	}
+	syslogCh <- fmt.Sprintf("type=SwitchBotMotionSensor,address=%s,moving=%v,event=%s,lastMoveDiff=%d,lastMove=%s,battery=%d,light=%v",
+		ms.Address, ms.Moving, event, ms.LastMoveDiff, time.Unix(ms.LastMove, 0).Format(time.RFC3339), ms.Battery, ms.Light)
+}
+
 var lastSendTime int64
 
 func sendReport() {
@@ -370,6 +424,12 @@ func sendReport() {
 		}
 		syslogCh <- d.String()
 		report++
+		return true
+	})
+	motionSensorMap.Range(func(k, v interface{}) bool {
+		if ms, ok := v.(*MotionSensorEnt); ok {
+			sendMotionSensor(ms, "report")
+		}
 		return true
 	})
 	syslogCh <- fmt.Sprintf("type=Stats,total=%d,count=%d,new=%d,remove=%d,report=%d,junk=%d,send=%d,param=%s",
