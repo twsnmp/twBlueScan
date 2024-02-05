@@ -369,11 +369,19 @@ func sendSwitchBotPlugMini(d *BluetoothDeviceEnt) {
 }
 
 func sendMotionSensor(ms *MotionSensorEnt, event string) {
-	if debug {
-		log.Printf("switchbot motion sensor %s %+v", event, ms)
+	var d *BluetoothDeviceEnt
+	if v, ok := deviceMap.Load(ms.Address); !ok {
+		return
+	} else {
+		if d, ok = v.(*BluetoothDeviceEnt); !ok {
+			return
+		}
 	}
-	syslogCh <- fmt.Sprintf("type=SwitchBotMotionSensor,address=%s,moving=%v,event=%s,lastMoveDiff=%d,lastMove=%s,battery=%d,light=%v",
-		ms.Address, ms.Moving, event, ms.LastMoveDiff, time.Unix(ms.LastMove, 0).Format(time.RFC3339), ms.Battery, ms.Light)
+	if debug {
+		log.Printf("switchbot motion sensor %s %+v %+v", event, d, ms)
+	}
+	syslogCh <- fmt.Sprintf("type=SwitchBotMotionSensor,address=%s,name=%s,rssi=%d,moving=%v,event=%s,lastMoveDiff=%d,lastMove=%s,battery=%d,light=%v",
+		ms.Address, d.Name, d.RSSI, ms.Moving, event, ms.LastMoveDiff, time.Unix(ms.LastMove, 0).Format(time.RFC3339), ms.Battery, ms.Light)
 }
 
 var lastSendTime int64
