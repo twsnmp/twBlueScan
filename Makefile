@@ -1,7 +1,7 @@
 .PHONY: all test clean zip
 
 ### バージョンの定義
-VERSION     := "v2.3.1"
+VERSION     := "v2.3.2"
 COMMIT      := $(shell git rev-parse --short HEAD)
 WD          := $(shell pwd)
 ### コマンドの定義
@@ -14,7 +14,7 @@ ZIP          = zip
 ### ターゲットパラメータ
 DIST = dist
 SRC = ./main.go ./blueScan.go ./syslog.go ./vendor.go
-TARGETS     = $(DIST)/twBlueScan $(DIST)/twBlueScan.arm
+TARGETS     = $(DIST)/twBlueScan $(DIST)/twBlueScan.arm $(DIST)/twBlueScan.arm64
 GO_PKGROOT  = ./...
 
 ### PHONY ターゲットのビルドルール
@@ -26,9 +26,12 @@ clean:
 zip: $(TARGETS)
 	cd dist && $(ZIP) twBlueScan_linux_amd64.zip twBlueScan
 	cd dist && $(ZIP) twBlueScan_linux_arm.zip twBlueScan.arm
+	cd dist && $(ZIP) twBlueScan_linux_arm64.zip twBlueScan.arm64
 
 ### 実行ファイルのビルドルール
 $(DIST)/twBlueScan: $(SRC)
 	env GO111MODULE=on GOOS=linux GOARCH=amd64 $(GO_BUILD) $(GO_LDFLAGS) -o $@
 $(DIST)/twBlueScan.arm: $(SRC)
 	env GO111MODULE=on GOOS=linux GOARCH=arm GOARM=7 $(GO_BUILD) $(GO_LDFLAGS) -o $@
+$(DIST)/twBlueScan.arm64: $(SRC)
+	env GO111MODULE=on GOOS=linux GOARCH=arm64  $(GO_BUILD) $(GO_LDFLAGS) -o $@
