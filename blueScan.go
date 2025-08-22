@@ -25,6 +25,7 @@ type BluetoothDeviceEnt struct {
 	Info        string
 	Count       int
 	Code        uint16
+	SBType      uint8
 	EnvData     []byte
 	FirstTime   int64
 	LastTime    int64
@@ -165,16 +166,11 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 					d.EnvData = a.Data[2:]
 				}
 			case 0x0969:
-				// SwitchBot Plug Mini
-				// https://github.com/OpenWonderLabs/SwitchBotAPI-BLE/blob/latest/devicetypes/plugmini.md
-				// UUID 105 9
-				// MAC 96 85 249 45 33 206
-				// Seq 25
-				// On/Off 128
-				// Time 0
-				// wifi RSSI 0
-				// Load 1 214  Overload
 				if len(a.Data) >= 14 {
+					// Temp , Hum & Co2
+					// Temp & Hum IP65
+					// SwitchBot Plug Mini
+					// https://github.com/OpenWonderLabs/SwitchBotAPI-BLE/blob/latest/devicetypes/plugmini.md
 					d.EnvData = a.Data[9:]
 				}
 			case 0x004c, 0x0006:
@@ -237,7 +233,12 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 					motionSensorMap.Store(addr, ms)
 					sendMotionSensor(ms, "new")
 				}
+				d.SBType = 0x73 //
 			} else {
+				if d.Code == 0x0969 && len(a.Data) > 3 && a.Data[0] == 0x3d &&
+					a.Data[1] == 0xfd {
+					d.SBType = a.Data[2]
+				}
 				if debug {
 					log.Printf("AdServiceData data=%x", a.Data)
 				}
@@ -355,6 +356,47 @@ func sendSwitchBotEnv(d *BluetoothDeviceEnt) {
 	)
 }
 
+// 64 009d 2d 0301000000
+func sendSwitchBotCo2(d *BluetoothDeviceEnt) {
+	if len(d.EnvData) < 8 {
+		return
+	}
+	bat := int(d.EnvData[0] & 0x7f)
+	temp := float64(int(d.EnvData[1]&0x0f))/10.0 + float64(d.EnvData[2]&0x7f)
+	if (d.EnvData[2] & 0x80) != 0x80 {
+		temp *= -1.0
+	}
+	hum := float64(int(d.EnvData[3] & 0x7f))
+	co2 := int(d.EnvData[6])*256 + int(d.EnvData[7])
+	if debug {
+		log.Printf("switchbot temp=%.02f,hum=%.02f,co2=%d,bat=%d", temp, hum, co2, bat)
+	}
+	syslogCh <- fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,co2=%d,bat=%d",
+		d.Address, d.Name, d.RSSI,
+		temp, hum, co2, bat,
+	)
+}
+
+// 0e 099c 29 00
+func sendSwitchBotIP64(d *BluetoothDeviceEnt) {
+	if len(d.EnvData) < 5 {
+		return
+	}
+	bat := int(d.EnvData[0] & 0x7f)
+	temp := float64(int(d.EnvData[1]&0x0f))/10.0 + float64(d.EnvData[2]&0x7f)
+	if (d.EnvData[2] & 0x80) != 0x80 {
+		temp *= -1.0
+	}
+	hum := float64(int(d.EnvData[3] & 0x7f))
+	if debug {
+		log.Printf("switchbot temp=%.02f,hum=%.02f,bat=%d", temp, hum, bat)
+	}
+	syslogCh <- fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,bat=%d",
+		d.Address, d.Name, d.RSSI,
+		temp, hum, bat,
+	)
+}
+
 func sendSwitchBotPlugMini(d *BluetoothDeviceEnt) {
 	sw := d.EnvData[0] == 0x80
 	over := (d.EnvData[3] & 0x80) == 0x80
@@ -423,9 +465,18 @@ func sendReport() {
 		} else if len(d.EnvData) == 8 && d.EnvData[0] == 0 && d.EnvData[1] == 0x0d && d.EnvData[2] == 0x54 {
 			sendSwitchBotEnv(d)
 			swbot++
-		} else if len(d.EnvData) >= 4 && d.Code == 0x0969 {
-			sendSwitchBotPlugMini(d)
-			swbot++
+		} else if d.Code == 0x0969 && len(d.EnvData) >= 4 {
+			switch d.SBType {
+			case 0x35:
+				sendSwitchBotCo2(d)
+				swbot++
+			case 0x77:
+				sendSwitchBotIP64(d)
+				swbot++
+			default:
+				sendSwitchBotPlugMini(d)
+				swbot++
+			}
 		}
 		if debug {
 			log.Println(d.String())
