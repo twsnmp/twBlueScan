@@ -243,7 +243,7 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 					log.Printf("AdServiceData data=%x", a.Data)
 				}
 			}
-		case hci.AdComplete16BitService:
+		case hci.AdComplete16BitService, hci.AdSlaveConnInterval:
 			// Skip
 		default:
 			if debug {
