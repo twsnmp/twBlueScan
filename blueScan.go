@@ -58,20 +58,21 @@ var motionSensorMap sync.Map
 // startBlueScan : start scan
 func startBlueScan(ctx context.Context) {
 	if err := exec.Command("hciconfig", adapter, "down").Run(); err != nil {
-		log.Panicf("start bluescan err=%v", err)
+		log.Fatalf("start bluescan err=%v", err)
 	}
 	raw, err := hci.Raw(adapter)
 	if err != nil {
-		log.Fatalln("Raw", err)
+		log.Fatalf("start bluescan err=%v", err)
 	}
 	h := host.New(raw)
 	if err = h.Init(); err != nil {
-		log.Fatalln("Init", err)
+		log.Fatalf("start bluescan err=%v", err)
 	}
 	reportCh, err := h.StartScanning(active, nil)
 	if err != nil {
-		log.Fatalln("startScan", err)
+		log.Fatalf("start bluescan err=%v", err)
 	}
+	log.Println("start bluescan")
 	timer := time.NewTicker(time.Second * time.Duration(syslogInterval))
 	defer timer.Stop()
 	for {

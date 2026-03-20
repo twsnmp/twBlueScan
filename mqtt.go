@@ -126,10 +126,34 @@ func startMQTT(ctx context.Context) {
 			return
 		case msg := <-mqttCh:
 			if s := makeMqttData(msg); s != "" {
-				client.Publish(mqttTopic, 1, false, s).Wait()
+				if debug {
+					log.Println(s)
+				}
+				client.Publish(getMqttTopic(msg), 1, false, s).Wait()
 			}
 		}
 	}
+}
+
+func getMqttTopic(msg interface{}) string {
+	r := mqttTopic
+	switch msg.(type) {
+	case *mqttDeviceDataEnt:
+		r += "/Device"
+	case *mqttEnvDataEnt:
+		r += "/Env"
+	case *mqttMotionSensorDataEnt:
+		r += "/Motion"
+	case *mqttPowerMonitorPlugDataEnt:
+		r += "/Power"
+	case *mqttBlueScanStatsDataEnt:
+		r += "/BlueScanStats"
+	case *mqttMonitorDataEnt:
+		r += "/Monitor"
+	default:
+		log.Printf("getMqttTopic: unknown msg type %T", msg)
+	}
+	return r
 }
 
 func makeMqttData(msg interface{}) string {

@@ -14,6 +14,7 @@ var syslogCh = make(chan string, 2000)
 var syslogCount = 0
 
 func startSyslog(ctx context.Context) {
+	log.Printf("start syslog dst=%s", syslogDst)
 	dstList := strings.Split(syslogDst, ",")
 	dst := []net.Conn{}
 	for _, d := range dstList {
@@ -22,7 +23,7 @@ func startSyslog(ctx context.Context) {
 		}
 		s, err := net.Dial("udp", d)
 		if err != nil {
-			log.Fatal(err)
+			log.Fatalf("start syslog err=%v", err)
 		}
 		sendSyslog(fmt.Sprintf("start send syslog to %s", d))
 		dst = append(dst, s)
