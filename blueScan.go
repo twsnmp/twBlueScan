@@ -333,10 +333,24 @@ func sendOMRONEnv(d *BluetoothDeviceEnt) {
 		log.Printf("omron seq=%d,temp=%.02f,hum=%.02f,lx=%d,press=%.02f,sound=%.02f,eTVOC=%d,eCO2=%d",
 			seq, temp, hum, lx, press, sound, v, co2)
 	}
-	syslogCh <- fmt.Sprintf("type=OMRONEnv,address=%s,name=%s,rssi=%d,seq=%d,temp=%.02f,hum=%.02f,lx=%d,press=%.02f,sound=%.02f,eTVOC=%d,eCO2=%d",
+	sendSyslog(fmt.Sprintf("type=OMRONEnv,address=%s,name=%s,rssi=%d,seq=%d,temp=%.02f,hum=%.02f,lx=%d,press=%.02f,sound=%.02f,eTVOC=%d,eCO2=%d",
 		d.Address, d.Name, d.RSSI,
 		seq, temp, hum, lx, press, sound, v, co2,
-	)
+	))
+	publishMQTT(&mqttEnvDataEnt{
+		Time:        time.Now().Format(time.RFC3339),
+		Address:     d.Address,
+		Name:        d.Name,
+		Type:        "OMRONEnv",
+		RSSI:        d.RSSI,
+		Temperature: temp,
+		Humidity:    hum,
+		Co2:         co2,
+		Lux:         lx,
+		Pressure:    press,
+		Sound:       sound,
+		TVOC:        v,
+	})
 }
 
 // 0x00 0d 54 10 e4 07 9a 37
@@ -350,10 +364,20 @@ func sendSwitchBotEnv(d *BluetoothDeviceEnt) {
 	if debug {
 		log.Printf("switchbot temp=%.02f,hum=%.02f,bat=%d", temp, hum, bat)
 	}
-	syslogCh <- fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,bat=%d",
+	sendSyslog(fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,bat=%d",
 		d.Address, d.Name, d.RSSI,
 		temp, hum, bat,
-	)
+	))
+	publishMQTT(&mqttEnvDataEnt{
+		Time:        time.Now().Format(time.RFC3339),
+		Address:     d.Address,
+		Name:        d.Name,
+		Type:        "SwitchBotEnv",
+		RSSI:        d.RSSI,
+		Temperature: temp,
+		Humidity:    hum,
+		Battery:     bat,
+	})
 }
 
 // 64 009d 2d 0301000000
@@ -371,10 +395,21 @@ func sendSwitchBotCo2(d *BluetoothDeviceEnt) {
 	if debug {
 		log.Printf("switchbot temp=%.02f,hum=%.02f,co2=%d,bat=%d", temp, hum, co2, bat)
 	}
-	syslogCh <- fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,co2=%d,bat=%d",
+	sendSyslog(fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,co2=%d,bat=%d",
 		d.Address, d.Name, d.RSSI,
 		temp, hum, co2, bat,
-	)
+	))
+	publishMQTT(&mqttEnvDataEnt{
+		Time:        time.Now().Format(time.RFC3339),
+		Address:     d.Address,
+		Name:        d.Name,
+		Type:        "SwitchBotEnv",
+		RSSI:        d.RSSI,
+		Temperature: temp,
+		Humidity:    hum,
+		Co2:         co2,
+		Battery:     bat,
+	})
 }
 
 // 0e 099c 29 00
@@ -391,10 +426,20 @@ func sendSwitchBotIP64(d *BluetoothDeviceEnt) {
 	if debug {
 		log.Printf("switchbot temp=%.02f,hum=%.02f,bat=%d", temp, hum, bat)
 	}
-	syslogCh <- fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,bat=%d",
+	sendSyslog(fmt.Sprintf("type=SwitchBotEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f,bat=%d",
 		d.Address, d.Name, d.RSSI,
 		temp, hum, bat,
-	)
+	))
+	publishMQTT(&mqttEnvDataEnt{
+		Time:        time.Now().Format(time.RFC3339),
+		Address:     d.Address,
+		Name:        d.Name,
+		Type:        "SwitchBotEnv",
+		RSSI:        d.RSSI,
+		Temperature: temp,
+		Humidity:    hum,
+		Battery:     bat,
+	})
 }
 
 func sendSwitchBotPlugMini(d *BluetoothDeviceEnt) {
@@ -404,10 +449,20 @@ func sendSwitchBotPlugMini(d *BluetoothDeviceEnt) {
 	if debug {
 		log.Printf("switchbot miniplug sw=%v,over=%v,load=%d", sw, over, load)
 	}
-	syslogCh <- fmt.Sprintf("type=SwitchBotPlugMini,address=%s,name=%s,rssi=%d,sw=%v,over=%v,load=%d",
+	sendSyslog(fmt.Sprintf("type=SwitchBotPlugMini,address=%s,name=%s,rssi=%d,sw=%v,over=%v,load=%d",
 		d.Address, d.Name, d.RSSI,
 		sw, over, load,
-	)
+	))
+	publishMQTT(&mqttPowerMonitorPlugDataEnt{
+		Time:    time.Now().Format(time.RFC3339),
+		Address: d.Address,
+		Name:    d.Name,
+		Type:    "SwitchBotPlugMini",
+		RSSI:    d.RSSI,
+		Switch:  sw,
+		Over:    over,
+		Load:    load,
+	})
 }
 
 func sendMotionSensor(ms *MotionSensorEnt, event string) {
@@ -422,8 +477,21 @@ func sendMotionSensor(ms *MotionSensorEnt, event string) {
 	if debug {
 		log.Printf("switchbot motion sensor %s %+v %+v", event, d, ms)
 	}
-	syslogCh <- fmt.Sprintf("type=SwitchBotMotionSensor,address=%s,name=%s,rssi=%d,moving=%v,event=%s,lastMoveDiff=%d,lastMove=%s,battery=%d,light=%v",
-		ms.Address, d.Name, d.RSSI, ms.Moving, event, ms.LastMoveDiff, time.Unix(ms.LastMove, 0).Format(time.RFC3339), ms.Battery, ms.Light)
+	sendSyslog(fmt.Sprintf("type=SwitchBotMotionSensor,address=%s,name=%s,rssi=%d,moving=%v,event=%s,lastMoveDiff=%d,lastMove=%s,battery=%d,light=%v",
+		ms.Address, d.Name, d.RSSI, ms.Moving, event, ms.LastMoveDiff, time.Unix(ms.LastMove, 0).Format(time.RFC3339), ms.Battery, ms.Light))
+	publishMQTT(&mqttMotionSensorDataEnt{
+		Time:         time.Now().Format(time.RFC3339),
+		Address:      ms.Address,
+		Name:         d.Name,
+		Type:         "SwitchBotMotionSensor",
+		RSSI:         d.RSSI,
+		Moving:       ms.Moving,
+		Light:        ms.Light,
+		LastMove:     ms.LastMove,
+		LastMoveDiff: ms.LastMoveDiff,
+		Battery:      ms.Battery,
+	})
+
 }
 
 var lastSendTime int64
@@ -481,7 +549,20 @@ func sendReport() {
 		if debug {
 			log.Println(d.String())
 		}
-		syslogCh <- d.String()
+		sendSyslog(d.String())
+		publishMQTT(&mqttDeviceDataEnt{
+			Time:        time.Now().Format(time.RFC3339),
+			Address:     d.Address,
+			Name:        d.Name,
+			AddressType: d.AddressType,
+			Info:        d.Info,
+			Vendor:      getVendor(d),
+			MinRSSI:     d.MinRSSI,
+			MaxRSSI:     d.MaxRSSI,
+			RSSI:        d.RSSI,
+			FirstTime:   time.Unix(d.FirstTime, 0).Format(time.RFC3339),
+			LastTime:    time.Unix(d.LastTime, 0).Format(time.RFC3339),
+		})
 		report++
 		return true
 	})
@@ -491,8 +572,18 @@ func sendReport() {
 		}
 		return true
 	})
-	syslogCh <- fmt.Sprintf("type=Stats,total=%d,count=%d,new=%d,remove=%d,report=%d,junk=%d,send=%d,param=%s",
-		total, count, new, remove, report, junk, syslogCount, adapter)
+	sendSyslog(fmt.Sprintf("type=Stats,total=%d,count=%d,new=%d,remove=%d,report=%d,junk=%d,send=%d,param=%s",
+		total, count, new, remove, report, junk, syslogCount, adapter))
+	publishMQTT(&mqttBlueScanStatsDataEnt{
+		Time:    time.Now().Format(time.RFC3339),
+		Total:   total,
+		Count:   count,
+		New:     new,
+		Remove:  remove,
+		Report:  report,
+		Adaptor: adapter,
+		Junk:    junk,
+	})
 	if debug {
 		log.Printf("total=%d skip=%d count=%d new=%d remove=%d omron=%d swbot=%d send=%d report=%d junk=%d",
 			total, skip, count, new, remove, omron, swbot, syslogCount, report, junk)

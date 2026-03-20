@@ -7,8 +7,6 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"runtime"
-	"runtime/pprof"
 	"strings"
 	"syscall"
 	"time"
@@ -17,10 +15,13 @@ import (
 var version = "v1.0.0"
 var commit = ""
 var syslogDst = ""
+var mqttDst = ""
+var mqttUser = ""
+var mqttPassword = ""
+var mqttClientID = "twBlueScan"
+var mqttTopic = "twBlueScan"
 var adapter = ""
 var syslogInterval = 300
-var cpuprofile string
-var memprofile string
 var codeToVendor string
 var addrToVendor string
 var debug bool
@@ -29,10 +30,13 @@ var allAddress bool
 
 func init() {
 	flag.StringVar(&syslogDst, "syslog", "", "syslog destnation list")
+	flag.StringVar(&mqttDst, "mqtt", "", "mqtt broker destnation")
+	flag.StringVar(&mqttUser, "mqttUser", "", "mqtt user name")
+	flag.StringVar(&mqttPassword, "mqttPassword", "", "mqtt password")
+	flag.StringVar(&mqttClientID, "mqttClientID", "twBlueScan", "mqtt client id")
+	flag.StringVar(&mqttTopic, "mqttTopic", "twBlueScan", "mqtt topic")
 	flag.StringVar(&adapter, "adapter", "hci0", "monitor bluetooth adapter")
 	flag.IntVar(&syslogInterval, "interval", 600, "syslog send interval(sec)")
-	flag.StringVar(&cpuprofile, "cpuprofile", "", "write cpu profile to `file`")
-	flag.StringVar(&memprofile, "memprofile", "", "write memory profile to `file`")
 	flag.StringVar(&codeToVendor, "code", "", "make company code to vendor map")
 	flag.StringVar(&addrToVendor, "addr", "", "make address to vendor map")
 	flag.BoolVar(&debug, "debug", false, "debug mode")
@@ -56,28 +60,6 @@ func (writer logWriter) Write(bytes []byte) (int, error) {
 func main() {
 	log.SetFlags(0)
 	log.SetOutput(new(logWriter))
-	if cpuprofile != "" {
-		f, err := os.Create(cpuprofile)
-		if err != nil {
-			log.Fatalf("could not create CPU profile: %v", err)
-		}
-		defer f.Close()
-		if err := pprof.StartCPUProfile(f); err != nil {
-			log.Fatalf("could not start CPU profile: %v", err)
-		}
-		defer pprof.StopCPUProfile()
-	}
-	if memprofile != "" {
-		f, err := os.Create(memprofile)
-		if err != nil {
-			log.Fatalf("could not create memory profile: %v", err)
-		}
-		defer f.Close()
-		runtime.GC() // get up-to-date statistics
-		if err := pprof.WriteHeapProfile(f); err != nil {
-			log.Fatalf("could not write memory profile:%v", err)
-		}
-	}
 	if codeToVendor != "" {
 		makeCodeToVendor()
 		return
@@ -90,16 +72,17 @@ func main() {
 	if adapter == "" {
 		log.Fatalln("no monitor adapter")
 	}
-	if syslogDst == "" {
-		log.Fatalln("no syslog distenation")
+	if syslogDst == "" && mqttDst == "" {
+		log.Fatalln("no syslog or mqtt distenation")
 	}
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
 	ctx, cancel := context.WithCancel(context.Background())
 	go startSyslog(ctx)
+	go startMQTT(ctx)
 	go startBlueScan(ctx)
 	<-quit
-	syslogCh <- "quit by signal"
+	sendSyslog("quit by signal")
 	time.Sleep(time.Second * 1)
 	log.Println("quit by signal")
 	cancel()

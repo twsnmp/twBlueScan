@@ -18,12 +18,14 @@ var lastBytesSent uint64
 
 // sendMonitor : センサーが稼働するPCのリソース情報を送信する
 func sendMonitor() {
+	mqttData := new(mqttMonitorDataEnt)
 	msg := "type=Monitor,"
 	cpus, err := cpu.Percent(0, false)
 	if err != nil {
 		log.Printf("sendMonitor err=%v", err)
 		return
 	}
+	mqttData.CPU = cpus[0]
 	msg += fmt.Sprintf("cpu=%.3f", cpus[0])
 	loads, err := load.Avg()
 	if err != nil {
@@ -31,12 +33,14 @@ func sendMonitor() {
 		return
 	}
 	msg += fmt.Sprintf(",load=%.3f", loads.Load1)
+	mqttData.Load = loads.Load1
 	mems, err := mem.VirtualMemory()
 	if err != nil {
 		log.Printf("sendMonitor err=%v", err)
 		return
 	}
 	msg += fmt.Sprintf(",mem=%.3f", mems.UsedPercent)
+	mqttData.Memory = mems.UsedPercent
 	nets, err := gopsnet.IOCounters(false)
 	if err != nil {
 		log.Printf("sendMonitor err=%v", err)
@@ -54,6 +58,10 @@ func sendMonitor() {
 			txSpeed /= (1000 * 1000)
 			msg += fmt.Sprintf(",recv=%d,sent=%d,rxSpeed=%.3f,txSpeed=%.3f",
 				dRecv, dSent, rxSpeed, txSpeed)
+			mqttData.Recv = dRecv
+			mqttData.Sent = dSent
+			mqttData.TxSpeed = txSpeed
+			mqttData.RxSpeed = rxSpeed
 		}
 	}
 	lastMonitorTime = time.Now().Unix()
@@ -65,5 +73,8 @@ func sendMonitor() {
 		return
 	}
 	msg += fmt.Sprintf(",process=%d,param=%s", len(pids), adapter)
-	syslogCh <- msg
+	mqttData.Process = len(pids)
+	mqttData.Time = time.Now().Format(time.RFC3339)
+	sendSyslog(msg)
+	publishMQTT(mqttData)
 }
