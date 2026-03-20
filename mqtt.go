@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 
 	mqtt "github.com/eclipse/paho.mqtt.golang"
 )
@@ -92,9 +93,16 @@ func startMQTT(ctx context.Context) {
 	if mqttDst == "" {
 		return
 	}
-	log.Println("start mqtt")
+	broker := mqttDst
+	if !strings.Contains(broker, "://") {
+		broker = "tcp://" + broker
+	}
+	if strings.LastIndex(broker, ":") <= 5 {
+		broker += ":1883"
+	}
+	log.Printf("start mqtt broker=%s", broker)
 	opts := mqtt.NewClientOptions()
-	opts.AddBroker(mqttDst)
+	opts.AddBroker(broker)
 	if mqttUser != "" && mqttPassword != "" {
 		opts.SetUsername(mqttUser)
 		opts.SetPassword(mqttPassword)
