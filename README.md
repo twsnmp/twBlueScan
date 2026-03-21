@@ -1,6 +1,6 @@
 # twBlueScan
 
-Bluetooth Device Sensor for TWSNMP FC
+twBlueScan is a sensor program for Linux that monitors surrounding Bluetooth Low Energy (BLE) devices and environmental sensors. It supports popular smart home devices like SwitchBot and Omron, sending real-time data to TWSNMP FC or other IoT platforms via Syslog and MQTT.
 
 [日本語の説明](./README_ja.md)
 
