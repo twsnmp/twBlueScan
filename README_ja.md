@@ -7,6 +7,8 @@ TWSNMP FC 用の Bluetooth デバイスセンサー
 [![Godoc Reference](https://godoc.org/github.com/twsnmp/twBlueScan?status.svg)](http://godoc.org/github.com/twsnmp/twBlueScan)
 [![Go Report Card](https://goreportcard.com/badge/twsnmp/twBlueScan)](https://goreportcard.com/report/twsnmp/twBlueScan)
 
+![](images/twBlueScan.png)
+
 ## 概要
 
 Linux マシンで周辺にある Bluetooth デバイスの情報を収集し、syslog または MQTT で TWSNMP FC などに送信するためのセンサープログラムです。
