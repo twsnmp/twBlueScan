@@ -21,6 +21,7 @@ type mqttDeviceDataEnt struct {
 	MaxRSSI     int    `json:"max_rssi"`
 	RSSI        int    `json:"rssi"`
 	Info        string `json:"info"`
+	UUID        string `json:"uuid"`
 	Count       int    `json:"count"`
 	FirstTime   string `json:"first_time"`
 	LastTime    string `json:"last_time"`

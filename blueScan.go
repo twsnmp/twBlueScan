@@ -27,14 +27,15 @@ type BluetoothDeviceEnt struct {
 	Code        uint16
 	SBType      uint8
 	EnvData     []byte
+	UUIDMap     map[string]bool
 	FirstTime   int64
 	LastTime    int64
 }
 
 func (d *BluetoothDeviceEnt) String() string {
-	return fmt.Sprintf("type=Device,address=%s,name=%s,rssi=%d,min=%d,max=%d,addrType=%s,vendor=%s,info=%s,ft=%s,lt=%s",
+	return fmt.Sprintf("type=Device,address=%s,name=%s,rssi=%d,min=%d,max=%d,addrType=%s,vendor=%s,info=%s,uuid=%s,ft=%s,lt=%s",
 		d.Address, d.Name, d.RSSI, d.MinRSSI, d.MaxRSSI,
-		d.AddressType, getVendor(d), d.Info,
+		d.AddressType, getVendor(d), d.Info, getUUID(d),
 		time.Unix(d.FirstTime, 0).Format(time.RFC3339),
 		time.Unix(d.LastTime, 0).Format(time.RFC3339),
 	)
@@ -123,6 +124,7 @@ func checkBlueDevice(r *host.ScanReport) {
 		MinRSSI:   int(r.Rssi),
 		MaxRSSI:   int(r.Rssi),
 		Count:     1,
+		UUIDMap:   make(map[string]bool),
 		FirstTime: now,
 		LastTime:  now,
 	}
@@ -138,8 +140,6 @@ func getVendor(d *BluetoothDeviceEnt) string {
 	}
 	return getVendorFromAddress(d.Address)
 }
-
-var uuidMap sync.Map
 
 func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 	if d.AddressType == "" {
@@ -201,16 +201,14 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 				}
 			}
 		case hci.AdTxPower:
-		case hci.AdComplete128BitService:
+		case hci.AdComplete128BitService, hci.AdMore128BitService:
 			if id, err := uuid.FromBytes(a.Data); err == nil {
-				if _, ok := uuidMap.Load(d.Address + id.String()); !ok {
-					uuidMap.Store(d.Address+id.String(), true)
-					if debug {
-						log.Println("uuid", d.Address, id.String())
-					}
-				}
-			} else {
-				log.Printf("uuid err=%v", err)
+				d.UUIDMap[id.String()] = true
+			}
+		case hci.AdComplete16BitService, hci.AdMore16BitService:
+			if len(a.Data) == 2 {
+				id := uint16(a.Data[1])*256 + uint16(a.Data[0])
+				d.UUIDMap[fmt.Sprintf("%04x", id)] = true
 			}
 		case hci.AdServiceData:
 			if len(a.Data) == 8 && a.Data[0] == 0 && a.Data[1] == 0x0d && a.Data[2] == 0x54 {
@@ -255,17 +253,14 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 				if d.Code == 0x0969 && len(a.Data) > 3 && a.Data[0] == 0x3d &&
 					a.Data[1] == 0xfd {
 					d.SBType = a.Data[2]
-				}
-				if debug {
-					log.Printf("AdServiceData d=%+v data=%x", d, a.Data)
+				} else {
+					if debug {
+						log.Printf("AdServiceData d=%+v data=%x", d, a.Data)
+					}
 				}
 			}
-		case hci.AdComplete16BitService, hci.AdSlaveConnInterval:
+		case hci.AdAppearance, hci.AdSlaveConnInterval:
 			// Skip
-		case hci.AdMore16BitService, hci.AdMore128BitService:
-			// Skip
-		case hci.AdAppearance:
-			// Skip Cano Camera
 		default:
 			if debug {
 				log.Printf("unknown d=%+v a=%s data=%x", d, a.String(), a.Data)
@@ -654,6 +649,7 @@ func sendReport() {
 			AddressType: d.AddressType,
 			Info:        d.Info,
 			Vendor:      getVendor(d),
+			UUID:        getUUID(d),
 			MinRSSI:     d.MinRSSI,
 			MaxRSSI:     d.MaxRSSI,
 			RSSI:        d.RSSI,
@@ -687,4 +683,12 @@ func sendReport() {
 	}
 	syslogCount = 0
 	lastSendTime = now
+}
+
+func getUUID(d *BluetoothDeviceEnt) string {
+	var uuids []string
+	for u := range d.UUIDMap {
+		uuids = append(uuids, u)
+	}
+	return strings.Join(uuids, ";")
 }
