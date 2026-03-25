@@ -653,6 +653,7 @@ func sendReport() {
 			MinRSSI:     d.MinRSSI,
 			MaxRSSI:     d.MaxRSSI,
 			RSSI:        d.RSSI,
+			Count:       d.Count,
 			FirstTime:   time.Unix(d.FirstTime, 0).Format(time.RFC3339),
 			LastTime:    time.Unix(d.LastTime, 0).Format(time.RFC3339),
 		})
