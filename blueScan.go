@@ -161,6 +161,18 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 				continue
 			}
 			code = uint16(a.Data[1])*256 + uint16(a.Data[0])
+
+			// InkbirdセンサーはManufacturer ID領域に環境データを格納するため、
+			// 偶然他のメーカーコード（AppleやGarminなど）と一致してスキップされるのを防ぎ、
+			// 同時に d.Code が温度データで書き換わるのを防ぐため code=0 をセットする
+			if isInkbird(d.Name) || isInkbird(name) {
+				if len(a.Data) == 9 || len(a.Data) == 18 || (len(a.Data) == 17 && a.Data[0] == 0x54 && a.Data[1] == 0x32) {
+					d.EnvData = a.Data
+					code = 0
+					d.Code = 0
+				}
+			}
+
 			switch code {
 			case 0x02d5:
 				if len(a.Data) >= 18 {
@@ -179,8 +191,12 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 			case 0x1c03, 0x1d03:
 				// data=031c71105d139c04e5ac2655f52ed242
 				// Bose Skip
+			case 0x0087:
+				// skip garmin
+			case 0x01a9:
+				// skip Canon
 			default:
-				if debug {
+				if code != 0 && debug {
 					log.Printf("AdManufacturerSpecific code=%04x data=%x d=%+v", code, a.Data, d)
 				}
 			}
@@ -241,14 +257,18 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 					d.SBType = a.Data[2]
 				}
 				if debug {
-					log.Printf("AdServiceData data=%x", a.Data)
+					log.Printf("AdServiceData d=%+v data=%x", d, a.Data)
 				}
 			}
 		case hci.AdComplete16BitService, hci.AdSlaveConnInterval:
 			// Skip
+		case hci.AdMore16BitService, hci.AdMore128BitService:
+			// Skip
+		case hci.AdAppearance:
+			// Skip Cano Camera
 		default:
 			if debug {
-				log.Printf("unknown d=%+v a=%s", d, a.String())
+				log.Printf("unknown d=%+v a=%s data=%x", d, a.String(), a.Data)
 			}
 		}
 	}
@@ -466,6 +486,78 @@ func sendSwitchBotPlugMini(d *BluetoothDeviceEnt) {
 	})
 }
 
+func isInkbird(name string) bool {
+	n := strings.ToLower(name)
+	return strings.HasPrefix(n, "sps") ||
+		strings.HasPrefix(n, "tps") ||
+		strings.HasPrefix(n, "ibs-") ||
+		strings.HasPrefix(n, "ith-") ||
+		strings.HasPrefix(n, "ink@iam-")
+}
+
+func sendInkbirdEnv(d *BluetoothDeviceEnt) {
+	if len(d.EnvData) < 8 {
+		return
+	}
+	var temp, hum float64
+	bat := -1
+	co2 := 0
+
+	if len(d.EnvData) == 9 {
+		tempRaw := int16(uint16(d.EnvData[0]) | (uint16(d.EnvData[1]) << 8))
+		humRaw := uint16(d.EnvData[2]) | (uint16(d.EnvData[3]) << 8)
+		bat = int(d.EnvData[7])
+		temp = float64(tempRaw) / 100.0
+		hum = float64(humRaw) / 100.0
+	} else if len(d.EnvData) == 18 {
+		tempRaw := int16(uint16(d.EnvData[6]) | (uint16(d.EnvData[7]) << 8))
+		humRaw := uint16(d.EnvData[8]) | (uint16(d.EnvData[9]) << 8)
+		bat = int(d.EnvData[10])
+		temp = float64(tempRaw) / 100.0
+		hum = float64(humRaw) / 100.0
+	} else if len(d.EnvData) == 17 {
+		status := d.EnvData[9]
+		tempRaw := int16((uint16(d.EnvData[10]) << 8) | uint16(d.EnvData[11]))
+		humRaw := (uint16(d.EnvData[12]) << 8) | uint16(d.EnvData[13])
+		co2 = int((uint16(d.EnvData[14]) << 8) | uint16(d.EnvData[15]))
+		tempF := float64(tempRaw) / 10.0
+		if (status & 0x02) != 0 {
+			temp = (tempF - 32) * 5.0 / 9.0
+		} else {
+			temp = tempF
+		}
+		hum = float64(humRaw) / 10.0
+	} else {
+		return
+	}
+
+	if debug {
+		log.Printf("inkbird type=InkbirdEnv,temp=%.02f,hum=%.02f,bat=%d,co2=%d", temp, hum, bat, co2)
+	}
+
+	msg := fmt.Sprintf("type=InkbirdEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f",
+		d.Address, d.Name, d.RSSI, temp, hum)
+	if bat >= 0 {
+		msg += fmt.Sprintf(",bat=%d", bat)
+	}
+	if co2 > 0 {
+		msg += fmt.Sprintf(",co2=%d", co2)
+	}
+	sendSyslog(msg)
+
+	publishMQTT(&mqttEnvDataEnt{
+		Time:        time.Now().Format(time.RFC3339),
+		Address:     d.Address,
+		Name:        d.Name,
+		Type:        "InkbirdEnv",
+		RSSI:        d.RSSI,
+		Temperature: temp,
+		Humidity:    hum,
+		Battery:     bat,
+		Co2:         co2,
+	})
+}
+
 func sendMotionSensor(ms *MotionSensorEnt, event string) {
 	var d *BluetoothDeviceEnt
 	if v, ok := deviceMap.Load(ms.Address); !ok {
@@ -503,6 +595,7 @@ func sendReport() {
 	remove := 0
 	omron := 0
 	swbot := 0
+	inkbird := 0
 	report := 0
 	junk := 0
 	now := time.Now().Unix()
@@ -546,6 +639,9 @@ func sendReport() {
 				sendSwitchBotPlugMini(d)
 				swbot++
 			}
+		} else if isInkbird(d.Name) && (len(d.EnvData) == 9 || len(d.EnvData) == 17 || len(d.EnvData) == 18) {
+			sendInkbirdEnv(d)
+			inkbird++
 		}
 		if debug {
 			log.Println(d.String())
@@ -586,8 +682,8 @@ func sendReport() {
 		Junk:    junk,
 	})
 	if debug {
-		log.Printf("total=%d skip=%d count=%d new=%d remove=%d omron=%d swbot=%d send=%d report=%d junk=%d",
-			total, skip, count, new, remove, omron, swbot, syslogCount, report, junk)
+		log.Printf("total=%d skip=%d count=%d new=%d remove=%d omron=%d swbot=%d inkbird=%d send=%d report=%d junk=%d",
+			total, skip, count, new, remove, omron, swbot, inkbird, syslogCount, report, junk)
 	}
 	syslogCount = 0
 	lastSendTime = now
