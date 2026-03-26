@@ -30,6 +30,7 @@ The collected information includes:
 - 2021/09/12: v2.0.0 switched to low-level package `bluewalker`.
 - 2021/09/27: v2.1.0 added support for SwitchBot sensors and active mode scanning.
 - 2026/03/20: v3.0.0 added MQTT support and automated release with GoReleaser.
+- 2026/03/26: v3.1.0 added Inkbird sensor support, UUID tracking, and device count reporting.
 
 ## Build
 
