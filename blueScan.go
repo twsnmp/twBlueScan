@@ -213,6 +213,8 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 		case hci.AdServiceData:
 			if len(a.Data) == 8 && a.Data[0] == 0 && a.Data[1] == 0x0d && a.Data[2] == 0x54 {
 				d.EnvData = a.Data[:]
+			} else if len(a.Data) == 8 && a.Data[0] == 0xf1 && a.Data[1] == 0xff {
+				d.EnvData = a.Data[:]
 			} else if r.Type == hci.ScanRsp && len(a.Data) == 8 && a.Data[0] == 0x3d &&
 				a.Data[1] == 0xfd && a.Data[2] == 0x73 {
 				// Motion Sensor Broadcast
@@ -522,6 +524,12 @@ func sendInkbirdEnv(d *BluetoothDeviceEnt) {
 			temp = tempF
 		}
 		hum = float64(humRaw) / 10.0
+	} else if len(d.EnvData) == 8 && d.EnvData[0] == 0xf1 && d.EnvData[1] == 0xff {
+		tempRaw := int16((uint16(d.EnvData[2]) << 8) | uint16(d.EnvData[3]))
+		humRaw := (uint16(d.EnvData[4]) << 8) | uint16(d.EnvData[5])
+		co2 = int((uint16(d.EnvData[6]) << 8) | uint16(d.EnvData[7]))
+		temp = float64(tempRaw) / 10.0
+		hum = float64(humRaw) / 10.0
 	} else {
 		return
 	}
@@ -634,7 +642,7 @@ func sendReport() {
 				sendSwitchBotPlugMini(d)
 				swbot++
 			}
-		} else if isInkbird(d.Name) && (len(d.EnvData) == 9 || len(d.EnvData) == 17 || len(d.EnvData) == 18) {
+		} else if isInkbird(d.Name) && (len(d.EnvData) == 8 || len(d.EnvData) == 9 || len(d.EnvData) == 17 || len(d.EnvData) == 18) {
 			sendInkbirdEnv(d)
 			inkbird++
 		}
