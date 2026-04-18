@@ -166,7 +166,7 @@ func checkDeviceInfo(d *BluetoothDeviceEnt, r *host.ScanReport) {
 			// 偶然他のメーカーコード（AppleやGarminなど）と一致してスキップされるのを防ぎ、
 			// 同時に d.Code が温度データで書き換わるのを防ぐため code=0 をセットする
 			if isInkbird(d.Name) || isInkbird(name) {
-				if len(a.Data) == 9 || len(a.Data) == 18 || (len(a.Data) == 17 && a.Data[0] == 0x54 && a.Data[1] == 0x32) {
+				if len(a.Data) == 9 || len(a.Data) == 18 || len(a.Data) == 19 || (len(a.Data) == 17 && a.Data[0] == 0x54 && a.Data[1] == 0x32) {
 					d.EnvData = a.Data
 					code = 0
 					d.Code = 0
@@ -496,7 +496,7 @@ func sendInkbirdEnv(d *BluetoothDeviceEnt) {
 	if len(d.EnvData) < 8 {
 		return
 	}
-	var temp, hum float64
+	var temp, hum, press float64
 	bat := -1
 	co2 := 0
 
@@ -506,17 +506,20 @@ func sendInkbirdEnv(d *BluetoothDeviceEnt) {
 		bat = int(d.EnvData[7])
 		temp = float64(tempRaw) / 100.0
 		hum = float64(humRaw) / 100.0
-	} else if len(d.EnvData) == 18 {
+	} else if len(d.EnvData) == 18 && !strings.HasPrefix(strings.ToLower(d.Name), "ink@iam-") {
 		tempRaw := int16(uint16(d.EnvData[6]) | (uint16(d.EnvData[7]) << 8))
 		humRaw := uint16(d.EnvData[8]) | (uint16(d.EnvData[9]) << 8)
 		bat = int(d.EnvData[10])
 		temp = float64(tempRaw) / 100.0
 		hum = float64(humRaw) / 100.0
-	} else if len(d.EnvData) == 17 {
+	} else if (len(d.EnvData) == 17 || len(d.EnvData) == 18 || len(d.EnvData) == 19) && strings.HasPrefix(strings.ToLower(d.Name), "ink@iam-") {
 		status := d.EnvData[9]
 		tempRaw := int16((uint16(d.EnvData[10]) << 8) | uint16(d.EnvData[11]))
 		humRaw := (uint16(d.EnvData[12]) << 8) | uint16(d.EnvData[13])
 		co2 = int((uint16(d.EnvData[14]) << 8) | uint16(d.EnvData[15]))
+		if len(d.EnvData) >= 18 {
+			press = float64(uint16(d.EnvData[16])<<8 | uint16(d.EnvData[17]))
+		}
 		tempF := float64(tempRaw) / 10.0
 		if (status & 0x02) != 0 {
 			temp = (tempF - 32) * 5.0 / 9.0
@@ -535,7 +538,7 @@ func sendInkbirdEnv(d *BluetoothDeviceEnt) {
 	}
 
 	if debug {
-		log.Printf("inkbird type=InkbirdEnv,temp=%.02f,hum=%.02f,bat=%d,co2=%d", temp, hum, bat, co2)
+		log.Printf("inkbird type=InkbirdEnv,temp=%.02f,hum=%.02f,bat=%d,co2=%d,press=%.02f", temp, hum, bat, co2, press)
 	}
 
 	msg := fmt.Sprintf("type=InkbirdEnv,address=%s,name=%s,rssi=%d,temp=%.02f,hum=%.02f",
@@ -545,6 +548,9 @@ func sendInkbirdEnv(d *BluetoothDeviceEnt) {
 	}
 	if co2 > 0 {
 		msg += fmt.Sprintf(",co2=%d", co2)
+	}
+	if press > 0 {
+		msg += fmt.Sprintf(",press=%.02f", press)
 	}
 	sendSyslog(msg)
 
@@ -558,6 +564,7 @@ func sendInkbirdEnv(d *BluetoothDeviceEnt) {
 		Humidity:    hum,
 		Battery:     bat,
 		Co2:         co2,
+		Pressure:    press,
 	})
 }
 
@@ -642,7 +649,7 @@ func sendReport() {
 				sendSwitchBotPlugMini(d)
 				swbot++
 			}
-		} else if isInkbird(d.Name) && (len(d.EnvData) == 8 || len(d.EnvData) == 9 || len(d.EnvData) == 17 || len(d.EnvData) == 18) {
+		} else if isInkbird(d.Name) && (len(d.EnvData) == 8 || len(d.EnvData) == 9 || len(d.EnvData) == 17 || len(d.EnvData) == 18 || len(d.EnvData) == 19) {
 			sendInkbirdEnv(d)
 			inkbird++
 		}
