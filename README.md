@@ -31,6 +31,7 @@ The collected information includes:
 - 2021/09/27: v2.1.0 added support for SwitchBot sensors and active mode scanning.
 - 2026/03/20: v3.0.0 added MQTT support and automated release with GoReleaser.
 - 2026/03/26: v3.1.0 added Inkbird sensor support, UUID tracking, and device count reporting.
+- 2026/04/18: v3.1.1 added support for atmospheric pressure data for Inkbird IAM-T1 sensors.
 
 ## Build
 
