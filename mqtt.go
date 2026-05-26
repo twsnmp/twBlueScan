@@ -75,7 +75,7 @@ type mqttBlueScanStatsDataEnt struct {
 	Remove  int    `json:"remove"`
 	Report  int    `json:"report"`
 	Junk    int    `json:"junk"`
-	Adaptor string `json:"adapter"`
+	Adapter string `json:"adapter"`
 }
 
 type mqttMonitorDataEnt struct {

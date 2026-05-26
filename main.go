@@ -29,8 +29,8 @@ var active bool
 var allAddress bool
 
 func init() {
-	flag.StringVar(&syslogDst, "syslog", "", "syslog destnation list")
-	flag.StringVar(&mqttDst, "mqtt", "", "mqtt broker destnation")
+	flag.StringVar(&syslogDst, "syslog", "", "syslog destination list")
+	flag.StringVar(&mqttDst, "mqtt", "", "mqtt broker destination")
 	flag.StringVar(&mqttUser, "mqttUser", "", "mqtt user name")
 	flag.StringVar(&mqttPassword, "mqttPassword", "", "mqtt password")
 	flag.StringVar(&mqttClientID, "mqttClientID", "twBlueScan", "mqtt client id")
@@ -73,7 +73,7 @@ func main() {
 		log.Fatalln("no monitor adapter")
 	}
 	if syslogDst == "" && mqttDst == "" {
-		log.Fatalln("no syslog or mqtt distenation")
+		log.Fatalln("no syslog or mqtt destination")
 	}
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, os.Interrupt, syscall.SIGTERM)
