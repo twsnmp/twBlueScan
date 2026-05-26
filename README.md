@@ -32,6 +32,7 @@ The collected information includes:
 - 2026/03/20: v3.0.0 added MQTT support and automated release with GoReleaser.
 - 2026/03/26: v3.1.0 added Inkbird sensor support, UUID tracking, and device count reporting.
 - 2026/04/18: v3.1.1 added support for atmospheric pressure data for Inkbird IAM-T1 sensors.
+- 2026/05/26: v3.1.2 added scanned device MAC address to MQTT topics to prevent data mixing, and fixed typos/shadowing.
 
 ## Build
 
