@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net"
-	"os"
 	"strings"
 	"time"
 )
@@ -28,10 +27,6 @@ func startSyslog(ctx context.Context) {
 		sendSyslog(fmt.Sprintf("start send syslog to %s", d))
 		dst = append(dst, s)
 	}
-	host, err := os.Hostname()
-	if err != nil {
-		host = "localhost"
-	}
 	defer func() {
 		for _, d := range dst {
 			d.Close()
@@ -44,7 +39,7 @@ func startSyslog(ctx context.Context) {
 			return
 		case msg := <-syslogCh:
 			syslogCount++
-			s := fmt.Sprintf("<%d>%s %s twBlueScan: %s", 21*8+6, time.Now().Format("2006-01-02T15:04:05-07:00"), host, msg)
+			s := fmt.Sprintf("<%d>%s %s twBlueScan: %s", 21*8+6, time.Now().Format("2006-01-02T15:04:05-07:00"), hostName, msg)
 			for _, d := range dst {
 				d.Write([]byte(s))
 			}

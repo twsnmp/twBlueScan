@@ -13,6 +13,7 @@ var mqttCh = make(chan interface{}, 2000)
 
 type mqttDeviceDataEnt struct {
 	Time        string `json:"time"`
+	Host        string `json:"host"`
 	Address     string `json:"address"`
 	AddressType string `json:"address_type"`
 	Name        string `json:"name"`
@@ -29,6 +30,7 @@ type mqttDeviceDataEnt struct {
 
 type mqttEnvDataEnt struct {
 	Time        string  `json:"time"`
+	Host        string  `json:"host"`
 	Type        string  `json:"type"`
 	Address     string  `json:"address"`
 	Name        string  `json:"name"`
@@ -45,6 +47,7 @@ type mqttEnvDataEnt struct {
 
 type mqttMotionSensorDataEnt struct {
 	Time         string `json:"time"`
+	Host         string `json:"host"`
 	Type         string `json:"type"`
 	Address      string `json:"address"`
 	Name         string `json:"name"`
@@ -58,6 +61,7 @@ type mqttMotionSensorDataEnt struct {
 
 type mqttPowerMonitorPlugDataEnt struct {
 	Time    string `json:"time"`
+	Host    string `json:"host"`
 	Type    string `json:"type"`
 	Address string `json:"address"`
 	Name    string `json:"name"`
@@ -69,6 +73,7 @@ type mqttPowerMonitorPlugDataEnt struct {
 
 type mqttBlueScanStatsDataEnt struct {
 	Time    string `json:"time"`
+	Host    string `json:"host"`
 	Total   int    `json:"total"`
 	Count   int    `json:"count"`
 	New     int    `json:"new"`
@@ -80,6 +85,7 @@ type mqttBlueScanStatsDataEnt struct {
 
 type mqttMonitorDataEnt struct {
 	Time    string  `json:"time"`
+	Host    string  `json:"host"`
 	CPU     float64 `json:"cpu"`
 	Memory  float64 `json:"memory"`
 	Load    float64 `json:"load"`
@@ -148,9 +154,9 @@ func getMqttTopic(msg interface{}) string {
 	case *mqttPowerMonitorPlugDataEnt:
 		r += "/Power/" + m.Address
 	case *mqttBlueScanStatsDataEnt:
-		r += "/BlueScanStats"
+		r += "/BlueScanStats/" + hostName
 	case *mqttMonitorDataEnt:
-		r += "/Monitor"
+		r += "/Monitor/" + hostName
 	default:
 		log.Printf("getMqttTopic: unknown msg type %T", msg)
 	}

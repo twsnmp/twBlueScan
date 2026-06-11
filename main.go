@@ -27,6 +27,7 @@ var addrToVendor string
 var debug bool
 var active bool
 var allAddress bool
+var hostName = ""
 
 func init() {
 	flag.StringVar(&syslogDst, "syslog", "", "syslog destination list")
@@ -42,12 +43,20 @@ func init() {
 	flag.BoolVar(&debug, "debug", false, "debug mode")
 	flag.BoolVar(&active, "active", false, "active scan mode")
 	flag.BoolVar(&allAddress, "all", false, "report all address(include private)")
+	flag.StringVar(&hostName, "host", "", "host name for identification")
 	flag.VisitAll(func(f *flag.Flag) {
 		if s := os.Getenv("TWBLUESCAN_" + strings.ToUpper(f.Name)); s != "" {
 			f.Value.Set(s)
 		}
 	})
 	flag.Parse()
+	if hostName == "" {
+		if h, err := os.Hostname(); err == nil {
+			hostName = h
+		} else {
+			hostName = "localhost"
+		}
+	}
 }
 
 type logWriter struct {

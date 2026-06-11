@@ -13,7 +13,7 @@ ZIP          = zip
 
 ### ターゲットパラメータ
 DIST = dist
-SRC = ./main.go ./blueScan.go ./syslog.go ./vendor.go
+SRC = ./main.go ./blueScan.go ./syslog.go ./vendor.go ./mqtt.go ./monitor.go
 TARGETS     = $(DIST)/twBlueScan $(DIST)/twBlueScan.arm $(DIST)/twBlueScan.arm64
 GO_PKGROOT  = ./...
 

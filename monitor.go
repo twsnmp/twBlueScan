@@ -75,6 +75,7 @@ func sendMonitor() {
 	msg += fmt.Sprintf(",process=%d,param=%s", len(pids), adapter)
 	mqttData.Process = len(pids)
 	mqttData.Time = time.Now().Format(time.RFC3339)
+	mqttData.Host = hostName
 	sendSyslog(msg)
 	publishMQTT(mqttData)
 }

@@ -357,6 +357,7 @@ func sendOMRONEnv(d *BluetoothDeviceEnt) {
 	))
 	publishMQTT(&mqttEnvDataEnt{
 		Time:        time.Now().Format(time.RFC3339),
+		Host:        hostName,
 		Address:     d.Address,
 		Name:        d.Name,
 		Type:        "OMRONEnv",
@@ -388,6 +389,7 @@ func sendSwitchBotEnv(d *BluetoothDeviceEnt) {
 	))
 	publishMQTT(&mqttEnvDataEnt{
 		Time:        time.Now().Format(time.RFC3339),
+		Host:        hostName,
 		Address:     d.Address,
 		Name:        d.Name,
 		Type:        "SwitchBotEnv",
@@ -419,6 +421,7 @@ func sendSwitchBotCo2(d *BluetoothDeviceEnt) {
 	))
 	publishMQTT(&mqttEnvDataEnt{
 		Time:        time.Now().Format(time.RFC3339),
+		Host:        hostName,
 		Address:     d.Address,
 		Name:        d.Name,
 		Type:        "SwitchBotEnv",
@@ -450,6 +453,7 @@ func sendSwitchBotIP64(d *BluetoothDeviceEnt) {
 	))
 	publishMQTT(&mqttEnvDataEnt{
 		Time:        time.Now().Format(time.RFC3339),
+		Host:        hostName,
 		Address:     d.Address,
 		Name:        d.Name,
 		Type:        "SwitchBotEnv",
@@ -473,6 +477,7 @@ func sendSwitchBotPlugMini(d *BluetoothDeviceEnt) {
 	))
 	publishMQTT(&mqttPowerMonitorPlugDataEnt{
 		Time:    time.Now().Format(time.RFC3339),
+		Host:    hostName,
 		Address: d.Address,
 		Name:    d.Name,
 		Type:    "SwitchBotPlugMini",
@@ -556,6 +561,7 @@ func sendInkbirdEnv(d *BluetoothDeviceEnt) {
 
 	publishMQTT(&mqttEnvDataEnt{
 		Time:        time.Now().Format(time.RFC3339),
+		Host:        hostName,
 		Address:     d.Address,
 		Name:        d.Name,
 		Type:        "InkbirdEnv",
@@ -584,6 +590,7 @@ func sendMotionSensor(ms *MotionSensorEnt, event string) {
 		ms.Address, d.Name, d.RSSI, ms.Moving, event, ms.LastMoveDiff, time.Unix(ms.LastMove, 0).Format(time.RFC3339), ms.Battery, ms.Light))
 	publishMQTT(&mqttMotionSensorDataEnt{
 		Time:         time.Now().Format(time.RFC3339),
+		Host:         hostName,
 		Address:      ms.Address,
 		Name:         d.Name,
 		Type:         "SwitchBotMotionSensor",
@@ -659,6 +666,7 @@ func sendReport() {
 		sendSyslog(d.String())
 		publishMQTT(&mqttDeviceDataEnt{
 			Time:        time.Now().Format(time.RFC3339),
+			Host:        hostName,
 			Address:     d.Address,
 			Name:        d.Name,
 			AddressType: d.AddressType,
@@ -685,6 +693,7 @@ func sendReport() {
 		total, count, newDevices, remove, report, junk, syslogCount, adapter))
 	publishMQTT(&mqttBlueScanStatsDataEnt{
 		Time:    time.Now().Format(time.RFC3339),
+		Host:    hostName,
 		Total:   total,
 		Count:   count,
 		New:     newDevices,
