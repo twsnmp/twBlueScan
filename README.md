@@ -33,6 +33,7 @@ The collected information includes:
 - 2026/03/26: v3.1.0 added Inkbird sensor support, UUID tracking, and device count reporting.
 - 2026/04/18: v3.1.1 added support for atmospheric pressure data for Inkbird IAM-T1 sensors.
 - 2026/05/26: v3.1.2 added scanned device MAC address to MQTT topics to prevent data mixing, and fixed typos/shadowing.
+- 2026/06/11: v3.2.0 added configurable host identification to MQTT topics and JSON payloads, and added option -host.
 
 ## Build
 
@@ -72,6 +73,8 @@ Usage of ./twBlueScan:
         Make company code to vendor map
   -debug
         Debug mode
+  -host string
+        Host name for identification
   -interval int
         Syslog send interval (sec) (default 600)
   -mqtt string
